@@ -1,10 +1,10 @@
 /*=============================================================================
   02_post_deploy.sql — Run AFTER the first DCM Deploy succeeds
 
-  Streams and alerts are not yet supported as DCM `DEFINE` statements,
-  so we create them here — then seed some source rows and trigger the
-  root task. The DMF attachments are defined natively inside the DCM
-  Project (see `sources/definitions/expectations.sql`).
+  Streams are not yet supported as DCM `DEFINE` statements, so we create them
+  here — then seed some source rows and trigger the root task. The DMF
+  attachments and failed-task alert are already DCM-managed (see
+  `sources/definitions/expectations.sql` and `sources/definitions/alerts.sql`).
 
   Replace <env_suffix> with the suffix from your manifest target
   (e.g. `_DEV` for DCM_DEV). All object names below use `_dev` for the
@@ -12,7 +12,6 @@
 =============================================================================*/
 
 USE ROLE dcm_developer;
-USE WAREHOUSE dcm_wh;
 
 ----------------------------------------------------------------------
 -- 1. Create the stream on TASK_DEMO_TABLE (used by DEMO_TASK_8)
@@ -22,38 +21,7 @@ CREATE OR REPLACE STREAM dcm_demo_4_dev.pipeline.demo_stream
     COMMENT = 'Empty stream — DEMO_TASK_8 will be skipped unless this has data';
 
 ----------------------------------------------------------------------
--- 2. Serverless alert for any failed Task in our database
-----------------------------------------------------------------------
-CREATE OR REPLACE ALERT dcm_demo_4_dev.pipeline.failed_task_alert
-    SCHEDULE = '60 MINUTE'
-    IF (EXISTS (
-        SELECT NAME, SCHEMA_NAME
-        FROM TABLE(DCM_DEMO_4_DEV.INFORMATION_SCHEMA.TASK_HISTORY(
-            SCHEDULED_TIME_RANGE_START => (GREATEST(
-                TIMEADD('DAY', -7, CURRENT_TIMESTAMP),
-                SNOWFLAKE.ALERT.LAST_SUCCESSFUL_SCHEDULED_TIME())),
-            SCHEDULED_TIME_RANGE_END   => SNOWFLAKE.ALERT.SCHEDULED_TIME(),
-            ERROR_ONLY                 => TRUE))))
-    THEN
-        BEGIN
-            LET task_names STRING := (
-                SELECT LISTAGG(DISTINCT(SCHEMA_NAME || '.' || NAME), ', ')
-                FROM TABLE(RESULT_SCAN(SNOWFLAKE.ALERT.GET_CONDITION_QUERY_UUID())));
-
-            CALL SYSTEM$SEND_SNOWFLAKE_NOTIFICATION(
-                SNOWFLAKE.NOTIFICATION.TEXT_HTML(
-                    'Failed tasks detected: <b>' || :task_names || '</b>'),
-                SNOWFLAKE.NOTIFICATION.EMAIL_INTEGRATION_CONFIG(
-                    'dcm_demo_email_notifications',
-                    'DCM Pipeline — Failed Task Alert',
-                    ARRAY_CONSTRUCT('INSERT_YOUR_EMAIL'),   -- <-- Replace with your verified email
-                    NULL, NULL));
-        END;
-
-ALTER ALERT dcm_demo_4_dev.pipeline.failed_task_alert RESUME;
-
-----------------------------------------------------------------------
--- 3. Seed the source table so LOAD_RAW_DATA has rows to pull
+-- 2. Seed the source table so LOAD_RAW_DATA has rows to pull
 ----------------------------------------------------------------------
 INSERT INTO dcm_demo_4_dev.pipeline.weather_data_source (DS, ZIPCODE, MIN_TEMP_IN_F, AVG_TEMP_IN_F, MAX_TEMP_IN_F)
 VALUES
@@ -69,17 +37,17 @@ VALUES
     ('2025-06-04', '94105', 59, 72, 84);
 
 ----------------------------------------------------------------------
--- 4. Kick off a manual run of the task graph
+-- 3. Kick off a manual run of the task graph
 ----------------------------------------------------------------------
 EXECUTE TASK dcm_demo_4_dev.pipeline.demo_task_1;
 
 ----------------------------------------------------------------------
--- 5. Force-run the alert (don't wait 60 minutes for the schedule)
+-- 4. Force-run the alert (don't wait 60 minutes for the schedule)
 ----------------------------------------------------------------------
 EXECUTE ALERT dcm_demo_4_dev.pipeline.failed_task_alert;
 
 ----------------------------------------------------------------------
--- 6. Inspect
+-- 5. Inspect
 ----------------------------------------------------------------------
 -- Navigate to Monitoring → Task History in Snowsight for the graph view,
 -- or query the task history programmatically:
