@@ -1,13 +1,13 @@
 -- Serverless alert that monitors the task graph and emails on failures.
 --
--- Defined as a DCM-managed alert with STARTED target-state, so it deploys
--- already running — no ALTER ALERT ... RESUME post-script needed.
+-- Defined with DCM so the alert is managed alongside the rest of the project.
+-- The alert is created in a suspended state — resume it in the post-deploy
+-- script with `ALTER ALERT ... RESUME`.
 -- Recipient email comes from the {{notification_recipient}} manifest value,
 -- the same one the finalizer uses, so you only configure it once.
 
 DEFINE ALERT DCM_DEMO_4{{env_suffix}}.PIPELINE.FAILED_TASK_ALERT
     SCHEDULE = '60 MINUTE'
-    STARTED
     IF (EXISTS (
         SELECT NAME, SCHEMA_NAME
         FROM TABLE(DCM_DEMO_4{{env_suffix}}.INFORMATION_SCHEMA.TASK_HISTORY(
