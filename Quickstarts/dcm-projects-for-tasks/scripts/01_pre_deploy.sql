@@ -38,23 +38,14 @@ GRANT DATABASE ROLE SNOWFLAKE.DATA_METRIC_USER TO ROLE dcm_developer;
 GRANT EXECUTE DATA METRIC FUNCTION ON ACCOUNT TO ROLE dcm_developer;
 
 ----------------------------------------------------------------------
--- 4. Create a Warehouse (optional — skip if you already have one)
-----------------------------------------------------------------------
-CREATE WAREHOUSE IF NOT EXISTS dcm_wh
-WITH
-    WAREHOUSE_SIZE = 'XSMALL'
-    AUTO_SUSPEND = 300
-    COMMENT = 'For Quickstart Demo of DCM Projects';
-
-----------------------------------------------------------------------
--- 5. Create the DCM Project Object
+-- 4. Create the DCM Project Object
 ----------------------------------------------------------------------
 USE ROLE dcm_developer;
 
 CREATE DATABASE IF NOT EXISTS dcm_demo;
 CREATE SCHEMA IF NOT EXISTS dcm_demo.projects;
 
-CREATE OR REPLACE DCM PROJECT dcm_demo.projects.dcm_project_dev
+CREATE OR REPLACE DCM PROJECT dcm_demo.projects.dcm_tasks_project_dev
     COMMENT = 'for testing DCM Projects with Tasks and task graphs';
 
 ----------------------------------------------------------------------
