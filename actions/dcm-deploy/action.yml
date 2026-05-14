@@ -43,7 +43,8 @@
 #       comment-on-pr: "true"
 #
 #   The deployment alias is set automatically to the source branch of the
-#   associated pull request (when one can be detected). If no PR branch can
+#   associated pull request combined with the short commit SHA (e.g.
+#   my-branch-a1b2c3d) so it stays unique per commit. If no PR branch can
 #   be found, no alias is passed.
 #
 #   When comment-on-pr is enabled, the calling job also needs:
@@ -193,7 +194,8 @@ runs:
         ALIAS_ARG=()
         PR_BRANCH="${{ steps.pr_branch.outputs.branch }}"
         if [ -n "$PR_BRANCH" ]; then
-          ALIAS_ARG=(--alias "$PR_BRANCH")
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          ALIAS_ARG=(--alias "${PR_BRANCH}-${SHORT_SHA}")
         fi
 
         set +e
