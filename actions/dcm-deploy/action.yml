@@ -41,6 +41,7 @@
 #       allow-drops: "false"
 #       test-expectations: "true"
 #       comment-on-pr: "true"
+#       alias: my-deployment-alias
 #
 #   When comment-on-pr is enabled, the calling job also needs:
 #
@@ -79,6 +80,10 @@ inputs:
     default: "false"
   post-scripts-path:
     description: "Relative path (from project-path) to a directory of .sql files to run after deploy, before refresh/test. Files are executed alphabetically with Jinja templating using manifest variables."
+    required: false
+    default: ""
+  alias:
+    description: "Deployment alias passed to snow dcm deploy --alias"
     required: false
     default: ""
 
@@ -157,8 +162,13 @@ runs:
       run: |
         TARGET="${{ inputs.target }}"
 
+        ALIAS_ARG=()
+        if [ -n "${{ inputs.alias }}" ]; then
+          ALIAS_ARG=(--alias "${{ inputs.alias }}")
+        fi
+
         set +e
-        deploy_output=$(snow dcm deploy --target "$TARGET" -x 2>&1)
+        deploy_output=$(snow dcm deploy --target "$TARGET" "${ALIAS_ARG[@]}" -x 2>&1)
         EXIT_CODE=$?
         set -e
 
