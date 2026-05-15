@@ -215,10 +215,16 @@ def main(session, db_name, schema_list, object_types, group_files_by_type, outpu
         if granted_to not in ('ROLE', 'DATABASE_ROLE'):
             return None
         grantee = row['grantee_name']
-        granted_on = row['granted_on']
+        granted_on = row['granted_on'].replace('_', ' ')
         obj_name = row['name']
         grant_opt = row['grant_option']
-        target = f"DATABASE ROLE {grantee}" if granted_to == 'DATABASE_ROLE' else f"ROLE {grantee}"
+        if granted_to == 'DATABASE_ROLE':
+            if '.' not in grantee:
+                target = f"DATABASE ROLE {q_db}.{_qid(grantee)}"
+            else:
+                target = f"DATABASE ROLE {grantee}"
+        else:
+            target = f"ROLE {grantee}"
         stmt = f"GRANT {priv} ON {granted_on} {obj_name} TO {target}"
         if str(grant_opt).upper() == 'TRUE':
             stmt += " WITH GRANT OPTION"
