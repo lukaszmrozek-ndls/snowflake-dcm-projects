@@ -99,9 +99,9 @@ define task DCM_DEMO_1{{env_suffix}}.RAW.INSERT_SAMPLE_DATA
     STARTED
 as
 begin
-    
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.TRUCK 
-    values
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.TRUCK (TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE)
+    select TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE
+    from (values
         (103, 'Taco Titan', 'Mexican Street Food'),
         (104, 'The Rolling Dough', 'Artisan Pizza'),
         (105, 'Wok n Roll', 'Asian Fusion'),
@@ -109,10 +109,17 @@ begin
         (107, 'Seoul Food', 'Korean BBQ'),
         (108, 'The Pita Pit Stop', 'Mediterranean'),
         (109, 'BBQ Barn', 'Slow-cooked Brisket'),
-        (110, 'Sweet Retreat', 'Desserts & Shakes');
-    
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.MENU 
-    values
+        (110, 'Sweet Retreat', 'Desserts & Shakes')
+    ) as src(TRUCK_ID, TRUCK_BRAND_NAME, MENU_TYPE)
+    where not exists (
+        select 1
+        from DCM_DEMO_1{{env_suffix}}.RAW.TRUCK t
+        where t.TRUCK_ID = src.TRUCK_ID
+    );
+
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.MENU (MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD)
+    select MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD
+    from (values
         (7, 'Beef Birria Tacos', 'Tacos', 3.00, 11.50),
         (8, 'Margherita Pizza', 'Pizza', 4.50, 12.00),
         (9, 'Pad Thai', 'Noodles', 3.50, 10.00),
@@ -126,10 +133,17 @@ begin
         (17, 'Vegan Poke Bowl', 'Bowls', 4.00, 13.00),
         (18, 'Kimchi Fries', 'Sides', 2.50, 7.50),
         (19, 'Mango Lassi', 'Drinks', 1.00, 4.50),
-        (20, 'Double Pepperoni Pizza', 'Pizza', 5.00, 14.00);
-    
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER 
-    values
+        (20, 'Double Pepperoni Pizza', 'Pizza', 5.00, 14.00)
+    ) as src(MENU_ITEM_ID, MENU_ITEM_NAME, ITEM_CATEGORY, COST_OF_GOODS_USD, SALE_PRICE_USD)
+    where not exists (
+        select 1
+        from DCM_DEMO_1{{env_suffix}}.RAW.MENU m
+        where m.MENU_ITEM_ID = src.MENU_ITEM_ID
+    );
+
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER (CUSTOMER_ID, FIRST_NAME, LAST_NAME, CITY)
+    select CUSTOMER_ID, FIRST_NAME, LAST_NAME, CITY
+    from (values
         (4, 'David', 'Miller', 'London'),
         (5, 'Eve', 'Davis', 'New York'),
         (6, 'Frank', 'Wilson', 'Chicago'),
@@ -146,10 +160,17 @@ begin
         (17, 'Quinn', 'Martinez', 'Chicago'),
         (18, 'Rose', 'Robinson', 'London'),
         (19, 'Sam', 'Clark', 'San Francisco'),
-        (20, 'Tina', 'Rodriguez', 'New York');
-    
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY 
-    values
+        (20, 'Tina', 'Rodriguez', 'New York')
+    ) as src(CUSTOMER_ID, FIRST_NAME, LAST_NAME, CITY)
+    where not exists (
+        select 1
+        from DCM_DEMO_1{{env_suffix}}.RAW.CUSTOMER c
+        where c.CUSTOMER_ID = src.CUSTOMER_ID
+    );
+
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY (ITEM_ID, REGION_ID, IN_STOCK, COUNTED_ON)
+    select ITEM_ID, REGION_ID, IN_STOCK, COUNTED_ON
+    from (values
         (7, 103, 50, '2023-10-27 09:00:00'), (8, 104, 40, '2023-10-27 09:00:00'),
         (9, 105, 30, '2023-10-27 09:00:00'), (10, 106, 45, '2023-10-27 09:00:00'),
         (11, 107, 35, '2023-10-27 09:00:00'), (12, 108, 60, '2023-10-27 09:00:00'),
@@ -159,32 +180,45 @@ begin
         (11, 107, 28, '2023-10-28 20:00:00'), (12, 108, 45, '2023-10-28 20:00:00'),
         (15, 103, 100, '2023-10-27 08:00:00'), (16, 104, 80, '2023-10-27 08:00:00'),
         (17, 105, 40, '2023-10-27 08:00:00'), (18, 107, 90, '2023-10-27 08:00:00'),
-        (19, 106, 60, '2023-10-27 08:00:00'), (20, 104, 30, '2023-10-27 08:00:00');
-    
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER 
-    values
-        (1006, 4, 103, '2023-10-28 14:00:00'), (1007, 5, 104, '2023-10-28 14:15:00'),
-        (1008, 6, 105, '2023-10-28 15:30:00'), (1009, 7, 106, '2023-10-28 16:45:00'),
-        (1010, 8, 107, '2023-10-28 17:00:00'), (1011, 9, 108, '2023-10-29 11:30:00'),
-        (1012, 10, 109, '2023-10-29 12:00:00'), (1013, 11, 110, '2023-10-29 12:15:00'),
-        (1014, 12, 101, '2023-10-29 13:00:00'), (1015, 13, 102, '2023-10-29 13:30:00'),
-        (1016, 14, 103, '2023-10-29 14:00:00'), (1017, 15, 104, '2023-10-29 14:20:00'),
-        (1018, 16, 105, '2023-10-29 15:00:00'), (1019, 17, 106, '2023-10-29 15:45:00'),
-        (1020, 18, 107, '2023-10-29 16:10:00'), (1021, 19, 108, '2023-10-29 17:00:00'),
-        (1022, 20, 109, '2023-10-30 11:00:00'), (1023, 1, 110, '2023-10-30 11:30:00'),
-        (1024, 2, 103, '2023-10-30 12:15:00'), (1025, 3, 104, '2023-10-30 13:00:00');
-    
-    insert into DCM_DEMO_1{{env_suffix}}.RAW.ORDER_DETAIL 
-    values
-        (1006, 7, 3), (1006, 15, 2), -- 3 Tacos, 2 Matcha
-        (1007, 8, 1), (1007, 16, 1), -- Pizza & Wings
-        (1008, 9, 1), (1008, 18, 1), -- Pad Thai & Kimchi Fries
-        (1009, 10, 2), (1009, 19, 2), -- Curry & Lassi
-        (1010, 11, 1), (1010, 18, 1), -- Bulgogi & Fries
-        (1011, 12, 2), (1011, 3, 1),  -- Gyro & Truffle Fries
-        (1012, 13, 3), (1012, 5, 3),  -- Sliders & Coffee
-        (1013, 14, 2), (1013, 15, 2), -- Lava Cake & Matcha
-        (1014, 1, 1), (1014, 6, 1),   -- Falafel & Chicken Gyro
-        (1015, 2, 2), (1015, 3, 2);   -- Burgers & Fries
+        (19, 106, 60, '2023-10-27 08:00:00'), (20, 104, 30, '2023-10-27 08:00:00')
+    ) as src(ITEM_ID, REGION_ID, IN_STOCK, COUNTED_ON)
+    where not exists (
+        select 1
+        from DCM_DEMO_1{{env_suffix}}.RAW.INVENTORY i
+        where i.ITEM_ID = src.ITEM_ID
+            and i.REGION_ID = src.REGION_ID
+            and i.COUNTED_ON = src.COUNTED_ON
+    );
+
+
+    let order_id_offset NUMBER := (
+        select coalesce(max(ORDER_ID), 1000)
+        from DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER
+    );
+
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.ORDER_HEADER (ORDER_ID, CUSTOMER_ID, TRUCK_ID, ORDER_TS)
+    select :order_id_offset + ROW_NUM, CUSTOMER_ID, TRUCK_ID, current_timestamp()
+    from (values
+        (1, 4, 103),  (2, 5, 104),  (3, 6, 105),  (4, 7, 106),
+        (5, 8, 107),  (6, 9, 108),  (7, 10, 109), (8, 11, 110),
+        (9, 12, 101), (10, 13, 102),(11, 14, 103),(12, 15, 104),
+        (13, 16, 105),(14, 17, 106),(15, 18, 107),(16, 19, 108),
+        (17, 20, 109),(18, 1, 110), (19, 2, 103), (20, 3, 104)
+    ) as src(ROW_NUM, CUSTOMER_ID, TRUCK_ID);
+
+    insert into DCM_DEMO_1{{env_suffix}}.RAW.ORDER_DETAIL (ORDER_ID, MENU_ITEM_ID, QUANTITY)
+    select :order_id_offset + ROW_NUM, MENU_ITEM_ID, QUANTITY
+    from (values
+        (1, 7, 3),  (1, 15, 2),
+        (2, 8, 1),  (2, 16, 1),
+        (3, 9, 1),  (3, 18, 1),
+        (4, 10, 2), (4, 19, 2),
+        (5, 11, 1), (5, 18, 1),
+        (6, 12, 2), (6, 3, 1),
+        (7, 13, 3), (7, 5, 3),
+        (8, 14, 2), (8, 15, 2),
+        (9, 1, 1),  (9, 6, 1),
+        (10, 2, 2), (10, 3, 2)
+    ) as src(ROW_NUM, MENU_ITEM_ID, QUANTITY);
 
 end;
