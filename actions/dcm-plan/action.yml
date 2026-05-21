@@ -154,17 +154,28 @@ runs:
             echo "${OP_TYPE,,}-count=${OP_COUNT}" >> "$GITHUB_OUTPUT"
 
             if [ "$OP_COUNT" -gt 0 ]; then
-              OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" \
-                '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' \
-                "$PLAN_METADATA_FILE")
-
               write_summary '```'
-              for DOMAIN in $OBJECT_DOMAINS; do
-                DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" \
-                  '[.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)] | length' \
+              if [ "$OP_TYPE" = "ALTER" ]; then
+                while IFS= read -r LINE; do
+                  write_summary "$LINE"
+                done < <(jq -r '
+                  .changeset[]
+                  | select(.type == "ALTER")
+                  | "- \(.object_id.domain) \(.object_id.fqn): " +
+                    ((.changes // []) | map(.attribute_name) | join(", "))
+                ' "$PLAN_METADATA_FILE")
+              else
+                OBJECT_DOMAINS=$(jq -r --arg OP_TYPE "$OP_TYPE" \
+                  '[.changeset[] | select(.type == $OP_TYPE) | .object_id.domain] | unique | .[]' \
                   "$PLAN_METADATA_FILE")
-                write_summary "- ${DOMAIN}: ${DOMAIN_COUNT}"
-              done
+
+                for DOMAIN in $OBJECT_DOMAINS; do
+                  DOMAIN_COUNT=$(jq --arg OP_TYPE "$OP_TYPE" --arg DOMAIN "$DOMAIN" \
+                    '[.changeset[] | select(.type == $OP_TYPE and .object_id.domain == $DOMAIN)] | length' \
+                    "$PLAN_METADATA_FILE")
+                  write_summary "- ${DOMAIN}: ${DOMAIN_COUNT}"
+                done
+              fi
               write_summary '```'
             fi
           done
