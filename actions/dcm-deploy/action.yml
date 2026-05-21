@@ -135,19 +135,11 @@ runs:
         TOTAL_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq 'length')
 
         if [ "$TOTAL_DROPS" -gt 0 ]; then
-          DATABASE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "DATABASE")] | length')
-          SCHEMA_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "SCHEMA")] | length')
-          TABLE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "TABLE")] | length')
-          STAGE_DROPS=$(echo "$DESTRUCTIVE_COMMANDS" | jq '[.[] | select(.object_id.domain == "STAGE")] | length')
-
           {
             echo "### ⚠️ PLAN contains DROP commands"
             echo "The plan contains **${TOTAL_DROPS}** DROP operation(s) for:"
             echo '```'
-            if [ "$DATABASE_DROPS" -gt 0 ]; then echo "- Databases: ${DATABASE_DROPS}"; fi
-            if [ "$SCHEMA_DROPS" -gt 0 ]; then echo "- Schemas: ${SCHEMA_DROPS}"; fi
-            if [ "$TABLE_DROPS" -gt 0 ]; then echo "- Tables: ${TABLE_DROPS}"; fi
-            if [ "$STAGE_DROPS" -gt 0 ]; then echo "- Stages: ${STAGE_DROPS}"; fi
+            echo "$DESTRUCTIVE_COMMANDS" | jq -r '.[] | "- \(.object_id.domain) \(.object_id.fqn)"'
             echo '```'
           } | tee -a "$DEPLOY_SUMMARY" >> "$GITHUB_STEP_SUMMARY"
           exit 1

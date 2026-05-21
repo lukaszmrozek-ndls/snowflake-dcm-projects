@@ -41,7 +41,7 @@ templating:
   configurations:
     DEV:
       env_suffix: "_DEV"
-      user_name: "INSERT_YOUR_USER"        #replace with your username 
+      user_name: "JSOMMERFELD"        #replace with your username 
       project_owner_role: "DCM_DEVELOPER" 
       teams: 
         - name: "DEV_TEAM_1" 
