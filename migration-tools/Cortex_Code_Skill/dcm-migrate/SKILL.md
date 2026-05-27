@@ -328,7 +328,7 @@ Prompt the user to run **Plan** via the Workspaces sidebar and share the results
 
 #### Plan validation
 
-The plan MUST show **zero changes** for existing objects. `GRANT` operations are acceptable (additive). `CREATE`, `ALTER`, or `DROP` operations indicate definition mismatches.
+The plan will not be a complete no-op. Each entity will show an `ALTER` that sets the DCM Project association (Project: `<project_name>`). This is expected and correct — it is how DCM records ownership of the object. Beyond these project-assignment ALTERs, the plan MUST show **zero changes** for existing objects. `GRANT` operations are also acceptable (additive). Any other `CREATE`, `ALTER`, or `DROP` operations indicate definition mismatches that need to be resolved.
 
 #### Resolving mismatches by reverse-diffing the PLAN output
 
@@ -412,6 +412,6 @@ If approved, make the changes and re-run PLAN + DEPLOY to validate the templated
 
 A DCM project managing the migrated database with:
 - Definition files in `sources/definitions/` matching the existing object state
-- Zero-change PLAN validation (definitions match reality)
+- Zero-change PLAN proves definitions match reality (except for new Project association)
 - Successful DEPLOY adoption
 - Optional: Jinja-templated definitions with variables and macros for multi-environment use
