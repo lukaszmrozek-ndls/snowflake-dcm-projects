@@ -5,12 +5,7 @@ description: "Bulk-migrate existing Snowflake objects into a new or existing DCM
 
 # DCM Migrate
 
-Bulk-migrate existing Snowflake database objects into a new or existing DCM project. Supports two execution modes:
-
-- **Local mode** (CLI + uv available): Runs `ddl_to_dcm.py` via Snowpark, then validates with `snow dcm plan` and adopts with `snow dcm deploy`.
-- **Workspaces mode** (Snowflake Workspaces / Snowsight IDE): Performs DDL→DEFINE conversion inline via SQL, writes files to the workspace filesystem, then prompts the user to run PLAN and DEPLOY through the Workspaces UI.
-
-The agent auto-detects the environment at the start of the workflow.
+Bulk-migrate existing Snowflake database objects into a new or existing DCM project. Runs `ddl_to_dcm.py` via `uv` to generate definition files, then validates with `snow dcm plan` and adopts with `snow dcm deploy`.
 
 ## When to Use
 
@@ -24,9 +19,8 @@ The agent auto-detects the environment at the start of the workflow.
 
 ## Prerequisites
 
-- **Local mode:** `snow` CLI 3.16+, `uv` installed
-- **Workspaces mode:** No CLI tools required; PLAN/DEPLOY run via the Workspaces UI
-- **Both modes:** Active Snowflake connection with a role that can `GET_DDL` every target object (see **Role visibility** below). For new projects: `CREATE DCM PROJECT` privilege in the target schema.
+- `snow` CLI 3.16+, `uv` installed
+- Active Snowflake connection with a role that can `GET_DDL` every target object (see **Role visibility** below). For new projects: `CREATE DCM PROJECT` privilege in the target schema.
 
 **Role visibility:**
 
@@ -49,7 +43,6 @@ Scans a database, retrieves DDL for all objects (tables, views, dynamic tables, 
 
 Automatically skips (reported as UNSUPPORTED):
 - **Semantic views** (not yet supported by DCM)
-- **Data metric functions** (GET_DDL signature does not match regular functions)
 - **Non-SQL functions and procedures** (Python, Java, JavaScript, Scala)
 - **External stages** (have a URL — manage outside DCM)
 - **OWNERSHIP grants** (implicit from object creation)
@@ -91,10 +84,6 @@ SNOWFLAKE_CONNECTION_NAME=<connection> uv run --project <SKILL_DIR> \
 ## Workflow
 
 ```
-Step 0: Environment Detection (auto)
-  ├─→ Local mode (uv + snow CLI available)
-  └─→ Workspaces mode (Snowsight IDE)
-  ↓
 Step 1: Gather Context
   ↓
 Step 2: Resolve Target (new or existing project?)
@@ -103,27 +92,19 @@ Step 2: Resolve Target (new or existing project?)
   ↓
   ⚠️ STOP: Approve target configuration
   ↓
-Step 3: Generate Definitions
-  ├─→ Local: run ddl_to_dcm.py via uv
-  └─→ Workspaces: inline SQL conversion by the agent
+Step 3: Generate Definitions (run ddl_to_dcm.py via uv)
   ↓
   ⚠️ STOP: Review generation results
   ↓
 Step 4: Integrate into Project (handle unsupported objects)
   ↓
 Step 5: Run ANALYZE → fix errors
-  ├─→ Local: snow dcm raw-analyze CLI
-  └─→ Workspaces: prompt user to run via UI
   ↓
 Step 6: Run PLAN → validate zero changes
-  ├─→ Local: snow dcm plan CLI
-  └─→ Workspaces: prompt user to run via UI
   ↓
   ⚠️ STOP: Present plan results, iterate if mismatches
   ↓
 Step 7: Run DEPLOY to adopt
-  ├─→ Local: snow dcm deploy CLI
-  └─→ Workspaces: prompt user to run via UI
   ↓
   ⚠️ STOP: Confirm deployment success
   ↓
@@ -131,20 +112,6 @@ Step 8: Jinja Templating Analysis (optional)
   ↓
   ⚠️ STOP: Present templating proposals
 ```
-
-### Step 0: Environment Detection
-
-Before gathering user input, detect the execution environment:
-
-1. Check if `uv` is available: run `which uv`
-2. Check if `snow` CLI is available: run `which snow`
-
-**If both are available → Local mode.** Proceed with the script-based workflow.
-
-**If either is missing → Workspaces mode.** Inform the user:
-> "Detected Workspaces environment (no local CLI tools). I'll generate definitions inline using SQL and you'll run PLAN/DEPLOY through the Workspaces UI."
-
-Store the detected mode and branch at Steps 3, 5, 6, and 7.
 
 ### Step 1: Gather Context
 
@@ -161,9 +128,8 @@ Collect from the user:
 3. **Object-type allow-list** (optional; omit for all supported types). Accepted values: `TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`.
 4. **Target DCM project** — new or existing?
 5. **Connection** — which Snowflake connection to use
-6. **Group by type** — one file per type per schema (recommended) or one file per object
 
-**Path handling:** Files must be on the local filesystem (DCM CLI requires it). If the user specifies a workspace/stage path, explain this and offer to sync after migration via `snow stage copy`.
+**Path handling:** Files must be on the local filesystem — the DCM CLI requires it.
 
 ### Step 2: Resolve Target
 
@@ -184,7 +150,7 @@ Collect from the user:
   └── sources/
       └── definitions/
   ```
-- Create `manifest.yml` using this template (substitute `<ACCOUNT_IDENTIFIER>` with the value fetched above):
+- Create `manifest.yml` using this template:
 
   **Minimal manifest (no templating):**
   ```yaml
@@ -230,35 +196,33 @@ Collect from the user:
         wh_size: "LARGE"
   ```
 
-  **CRITICAL:** The only valid top-level keys are `manifest_version`, `type`, `default_target`, `targets`, and `templating`. Any other keys (like `include_definitions`, `project`) will cause schema validation errors.
-
-- Place definitions in `sources/definitions/` — manifest v2 auto-discovers all `.sql` files in this directory
+— DCM auto-discovers all `.sql` files in `sources/definitions/`
 - Run `snow dcm create` to register the project object in Snowflake
 
 **If existing project:**
 
-- Locate `manifest.yml` and confirm the target
-- If no local sources exist, download them using `snow dcm list-deployments` + `snow stage copy`
+- Ask the user to specify the target path for the new definition files
+- Locate `manifest.yml` and ask the user if a new target should be created for testing or which existing target should be used
 
 **⚠️ MANDATORY STOPPING POINT**: Present the resolved target configuration (project identifier, connection, output directory) for user approval before proceeding.
 
 ### Step 3: Generate Definitions
 
-#### Local mode
+First verify uv is available:
 
-Run `ddl_to_dcm.py` using the command from the **Tools** section above, with `--output-path <project_dir>/sources/definitions --group-files-by-type`. Add `--schema-list` if only specific schemas should be migrated, and `--object-types` if only specific object types should be migrated. If the user chose **owned-only** in Step 1, add `--role <ROLE_NAME>` (using the role from `SELECT CURRENT_ROLE()`). Parse the JSON output from stdout.
+```bash
+uv --version
+```
 
-#### Workspaces mode
+If this fails, install uv before continuing:
 
-Replicate the logic of `ddl_to_dcm.py` inline using SQL queries and agent file writes:
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+# or: brew install uv
+```
 
-1. **Discover objects:** `SHOW OBJECTS IN DATABASE`, `SHOW SCHEMAS IN DATABASE`, `SHOW SEMANTIC VIEWS IN DATABASE` (to exclude semantic views). Per schema: `SHOW TASKS`, `SHOW USER FUNCTIONS`, `SHOW USER PROCEDURES`, `SHOW SEQUENCES`, `SHOW FILE FORMATS`, `SHOW ALERTS`. If owned-only, filter by the `owner` column. Query `INFORMATION_SCHEMA.PROCEDURES`/`FUNCTIONS` to skip non-SQL callables. On `SHOW USER FUNCTIONS` rows, skip any row with `is_data_metric = 'Y'` (reported as UNSUPPORTED: `data metric function`). If the user provided an object-type allow-list, validate every value against the canonical set (`TABLE`, `VIEW`, `DYNAMIC TABLE`, `TASK`, `FUNCTION`, `PROCEDURE`, `SEQUENCE`, `FILE FORMAT`, `ALERT`, `TAG`, `STAGE`, `SCHEMA`, `GRANT`) before any scanning, and skip the discovery steps for types that are not allowed.
-
-2. **Convert DDL:** For each object, run `GET_DDL`, replace `CREATE` with `DEFINE`, uppercase the type keyword, expand same-schema bare references to FQNs. For functions/procedures, use the signature form for `GET_DDL` and expand the bare name to a quoted FQN.
-
-3. **Extract grants:** `SHOW GRANTS ON DATABASE/SCHEMA/each object` and `SHOW FUTURE GRANTS IN DATABASE/SCHEMA`. Write non-OWNERSHIP grants to `grants.sql` files. Report OWNERSHIP and future grants as UNSUPPORTED.
-
-4. **Write files** using the directory structure from the Tools section. Scan for `BACKFILL FROM <bare_name>` warnings.
+Run `ddl_to_dcm.py` using the command from the **Tools** section above, always passing `--output-path <project_dir>/sources/definitions --group-files-by-type`. Add `--schema-list` if only specific schemas should be migrated, and `--object-types` if only specific object types should be migrated. If the user chose **owned-only** in Step 1, add `--role <ROLE_NAME>` (using the role from `SELECT CURRENT_ROLE()`). Parse the JSON output from stdout.
 
 **⚠️ MANDATORY STOPPING POINT**: Present results. Highlight ERROR, WARNING, UNSUPPORTED, and SAVED rows with counts. For BACKFILL warnings, ask whether to FQN-expand, leave as-is, or remove the clause. Confirm before proceeding.
 
@@ -273,12 +237,12 @@ Review the generated definitions for objects that DCM does not support with DEFI
 | Functions, Procedures (SQL only) | DEFINE | Keep in `sources/definitions/` |
 | Sequences, File Formats, Alerts, Tags | DEFINE | Keep in `sources/definitions/` |
 | Internal Stages (no URL) | DEFINE | Keep in `sources/definitions/`; PLAN may show ALTER if non-default file format or copy options are configured — hand-tune if needed |
-| External Stages (with URL) | Unsupported | Reported as UNSUPPORTED; manage outside DCM |
-| Streams | Not yet handled | Silently skipped by the migration |
-| Semantic Views | Unsupported | Recreate manually after deploy; the migration skips them |
-| Data Metric Functions | Unsupported | Recreate manually after deploy; the migration skips them |
-| Non-SQL Functions/Procedures (Python, Java, etc.) | Unsupported | Recreate manually after deploy; the migration skips them |
-| Integrations, Network Rules | Unsupported | Move to `pre_deploy.sql` |
+| External Stages (with URL) | SKIP (reported) | Reported as UNSUPPORTED; manage outside DCM |
+| Streams | SKIP (silent) | Silently skipped by the migration |
+| Semantic Views | SKIP (reported) | Recreate manually after deploy; the migration skips them |
+| Data Metric Functions | SKIP (reported) | Recreate manually after deploy; the migration skips them |
+| Non-SQL Functions/Procedures (Python, Java, etc.) | SKIP (reported) | Recreate manually after deploy; the migration skips them |
+| Integrations, Network Rules | SKIP (reported) | Move to `pre_deploy.sql` |
 
 **Concrete checks to perform:**
 
@@ -292,17 +256,11 @@ Review the generated definitions for objects that DCM does not support with DEFI
 
 ### Step 5: Run ANALYZE
 
-#### Local mode
-
 ```bash
 snow dcm raw-analyze -c <connection> --target <target> --from <project_dir>
 ```
 
 Read and parse the output.
-
-#### Workspaces mode
-
-Prompt the user to run **Analyze** via the Workspaces sidebar and share the results.
 
 #### Common issues to fix
 
@@ -314,17 +272,11 @@ Fix errors in the definition files and re-run analyze until it passes cleanly.
 
 ### Step 6: Run PLAN
 
-#### Local mode
-
 ```bash
 snow dcm plan -c <connection> --target <target> --save-output --from <project_dir>
 ```
 
 Read `<project_dir>/out/plan/plan_result.json` and parse the operations.
-
-#### Workspaces mode
-
-Prompt the user to run **Plan** via the Workspaces sidebar and share the results.
 
 #### Plan validation
 
@@ -353,17 +305,11 @@ Get explicit approval before deploying.
 
 ### Step 7: Run DEPLOY
 
-#### Local mode
-
 ```bash
 snow dcm deploy -c <connection> --target <target> --alias "migrate <source_db>" --from <project_dir>
 ```
 
 After deploy, verify with `snow dcm list-deployments -c <connection> --from <project_dir>`.
-
-#### Workspaces mode
-
-Prompt the user to run **Deploy** (alias: `migrate <source_db>`) via the Workspaces sidebar and confirm success.
 
 **⚠️ MANDATORY STOPPING POINT**: Confirm deployment success to the user. Report:
 - Deployment alias and timestamp
@@ -396,9 +342,7 @@ If approved, make the changes and re-run PLAN + DEPLOY to validate the templated
 
 ## Error Handling
 
-**Environment detection fails:** If `which uv` or `which snow` returns non-zero, assume Workspaces mode. If the user explicitly says they are in Workspaces, switch regardless.
-
-**"Cannot access database" (local mode):** Verify USAGE privilege and database name spelling (case-sensitive).
+**"Cannot access database":** Verify USAGE privilege and database name spelling (case-sensitive).
 
 **GET_DDL errors:** Logged as ERROR rows. Common cause: insufficient privileges. Fix by granting access or using `--role` to filter to owned objects.
 
@@ -407,6 +351,14 @@ If approved, make the changes and re-run PLAN + DEPLOY to validate the templated
 **PLAN shows ALTER:** Usually column ordering or default value formatting differences. Compare line-by-line with `SELECT GET_DDL('TABLE', '<fqn>', TRUE)` (the `TRUE` parameter is required).
 
 **ANALYZE syntax errors:** Check for unsupported DDL constructs (CTEs in correlated subqueries), or cross-database references missing FQN qualification.
+
+## Stopping Points
+
+- ✋ **Step 2** — Approve target configuration (project identifier, connection, output directory) before generating definitions
+- ✋ **Step 3** — Review generation results (SAVED / ERROR / UNSUPPORTED counts, BACKFILL warnings) before integrating
+- ✋ **Step 6** — Approve plan results (zero-change validation) before deploying
+- ✋ **Step 7** — Confirm deployment success
+- ✋ **Step 8** — Approve templating proposals before applying any changes
 
 ## Output
 
