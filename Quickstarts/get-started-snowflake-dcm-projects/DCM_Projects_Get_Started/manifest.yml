@@ -8,25 +8,25 @@ default_target: DCM_DEV
 
 targets:
   DCM_DEV:
-    account_identifier: MYORG-MY_DEV_ACCOUNT        # update to your account names
+    account_identifier: EJIYLIL-NDLSSP        # update to your account names
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_DEV
     project_owner: DCM_DEVELOPER
     templating_config: DEV
     
   DCM_STAGE:
-    account_identifier: MYORG-MY_STAGE_ACCOUNT
+    account_identifier: EJIYLIL-NDLSSP
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_STG
     project_owner: DCM_STAGE_DEPLOYER
     templating_config: STAGE
     
   DCM_PROD_US:
-    account_identifier: MYORG-MY_ACCOUNT_US
+    account_identifier: EJIYLIL-NDLSSP
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
 
   DCM_PROD_EU:
-    account_identifier: MYORG-MY_ACCOUNT_EU
+    account_identifier: EJIYLIL-NDLSSP
     project_name: DCM_DEMO.PROJECTS.DCM_PROJECT_PROD
     project_owner: DCM_PROD_DEPLOYER
     templating_config: PROD
@@ -41,7 +41,7 @@ templating:
   configurations:
     DEV:
       env_suffix: "_DEV"
-      user: "INSERT_YOUR_USER"
+      user: "LMROZEK"
       project_owner_role: "DCM_DEVELOPER" 
       teams: 
         - name: "DEV_TEAM_1" 
